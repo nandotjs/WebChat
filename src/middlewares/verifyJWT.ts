@@ -1,31 +1,43 @@
-import { Request, Response, NextFunction } from 'express';
+import { Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import User from '../models/userModel';
+import User, { IUser } from '../models/userModel';
 
 interface JwtPayload {
   id: string;
 }
 
-export const protect = async (req: Request, res: Response, next: NextFunction) => {
-  let token;
+export interface AuthenticatedSocket extends Socket {
+  user?: IUser;
+}
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+export const protectSocket = async (socket: AuthenticatedSocket, next: (err?: Error) => void) => {
+  console.log('Tentativa de conexão Socket.IO');
+  let token = socket.handshake.auth.token || socket.handshake.headers.authorization;
+
+  if (token && typeof token === 'string' && token.startsWith('Bearer ')) {
+    token = token.split(' ')[1];
+  }
+
+  console.log('Token recebido:', token);
+
+  if (token) {
     try {
-      token = req.headers.authorization.split(' ')[1];
-
       const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
 
-      req.user = await User.findById(decoded.id).select('-password');
+      // Encontra o usuário no banco de dados
+      const user = await User.findById(decoded.id).select('-password');
 
-      if (!req.user) {
-        return res.status(401).json({ message: 'Usuário não encontrado' });
+      if (!user) {
+        return next(new Error('Usuário não encontrado'));
       }
 
+      socket.user = user; // Anexa o usuário autenticado ao socket
       next();
     } catch (error) {
-      res.status(401).json({ message: 'Token inválido, não autorizado' });
+      console.error('Erro ao verificar token:', error);
+      next(new Error('Token inválido, não autorizado'));
     }
   } else {
-    res.status(401).json({ message: 'Token não encontrado, não autorizado' });
+    next(new Error('Token não encontrado, não autorizado'));
   }
 };

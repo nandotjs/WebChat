@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import User from '../models/userModel';
+import User, { IUser } from '../models/userModel';
 import generateToken from '../utils/generateToken';
 import { loginSchema } from '../schemas/userSchema';
 import { z } from 'zod';
@@ -12,12 +12,12 @@ export const loginUser = async (req: Request, res: Response) => {
     const { email, password } = validatedData;
 
     const user = await User.findOne({ email }).exec();
-    if (user && await (user as any).matchPassword(password)) {
+    if (user && await user.matchPassword(password)) {
         res.json({
-          _id: user._id.toString(),
+          _id: user._id,
           username: user.username,
           email: user.email,
-          token: generateToken(user._id.toString()),
+          token: generateToken(user._id as string),
         });
     } else {
       res.status(401).json({ message: 'Credenciais inválidas' });

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import User from '../models/userModel';
+import User, { IUser } from '../models/userModel';
 import generateToken from '../utils/generateToken';
 import { registerSchema } from '../schemas/userSchema';
 import { z } from 'zod';
@@ -18,10 +18,10 @@ export const registerUser = async (req: Request, res: Response) => {
 
     const user = await User.create({ username, email, password });
     res.status(201).json({
-      _id: user._id.toString(),
+      _id: user._id,
       username: user.username,
       email: user.email,
-      token: generateToken(user._id.toString()),
+      token: generateToken(user._id as string),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

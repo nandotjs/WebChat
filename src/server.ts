@@ -3,11 +3,25 @@ import dotenv from 'dotenv';
 import connectDB from './config/db';
 import authRoutes from './routes/authRoutes';
 import rateLimit from 'express-rate-limit';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import { protectSocket } from './middlewares/verifyJWT';
+import { configureChatSocket } from './socket/chatSocket';
+import cors from 'cors';
 
 dotenv.config();
 connectDB();
 
 const app = express();
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: "*", // Em produção, especifique os domínios permitidos
+    methods: ["GET", "POST"]
+  }
+});
+
+app.use(cors());
 app.use(express.json());
 
 const limiter = rateLimit({
@@ -20,5 +34,15 @@ app.use(limiter);
 
 app.use('/api/auth', authRoutes);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+io.on('connection', (socket) => {
+  console.log('Nova conexão Socket.IO');
+});
+
+io.use(protectSocket);
+configureChatSocket(io);
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Servidor HTTP rodando na porta ${PORT}`);
+  console.log(`Socket.IO disponível em http://localhost:${PORT}`);
+});

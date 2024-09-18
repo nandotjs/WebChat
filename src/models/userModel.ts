@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 import bcrypt from 'bcrypt';
 
 export interface IUser extends Document {
@@ -8,7 +8,7 @@ export interface IUser extends Document {
   matchPassword: (enteredPassword: string) => Promise<boolean>;
 }
 
-const userSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema<IUser>({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
 
 // Criptografa a senha antes de salvar
 userSchema.pre('save', async function (next) {
-  const user = this;
+  const user = this as IUser;
   if (!user.isModified('password')) return next();
 
   const salt = await bcrypt.genSalt(10);
@@ -26,8 +26,9 @@ userSchema.pre('save', async function (next) {
 
 // Método para comparar senhas
 userSchema.methods.matchPassword = async function (enteredPassword: string) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  const user = this as IUser;
+  return await bcrypt.compare(enteredPassword, user.password);
 };
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model<IUser>('User', userSchema);
 export default User;
