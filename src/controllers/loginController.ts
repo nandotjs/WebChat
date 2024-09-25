@@ -3,6 +3,7 @@ import User, { IUser } from '../models/userModel';
 import generateToken from '../utils/generateToken';
 import { loginSchema } from '../schemas/userSchema';
 import { z } from 'zod';
+import { io } from '../socket/socketServer'; 
 
 export const loginUser = async (req: Request, res: Response) => {
   try {
@@ -13,12 +14,17 @@ export const loginUser = async (req: Request, res: Response) => {
 
     const user = await User.findOne({ email }).exec();
     if (user && await user.matchPassword(password)) {
-        res.json({
-          _id: user._id,
-          username: user.username,
-          email: user.email,
-          token: generateToken(user._id as string),
-        });
+      const token = generateToken(user._id as string);
+      
+      // Emitir um evento de login bem-sucedido via Socket.IO
+      io.emit('userLoggedIn', { userId: user._id });
+
+      res.json({
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        token: token,
+      });
     } else {
       res.status(401).json({ message: 'Credenciais inválidas' });
     }
