@@ -6,18 +6,7 @@ export const configureChatSocket = (io: Server) => {
   io.on('connection', async (socket: AuthenticatedSocket) => {
     console.log('Um usuário se conectou:', socket.user?.username);
 
-    // Load previous messages
-    try {
-      const messages = await Message.find()
-        .sort({ createdAt: -1 })
-        .limit(50)
-        .populate('sender', 'username');
-      socket.emit('loadPreviousMessages', messages.reverse());
-    } catch (error) {
-      console.error('Erro ao carregar mensagens anteriores:', error);
-    }
-
-    socket.on('requestPreviousMessages', async () => {
+    const loadMessages = async () => {
       try {
         const messages = await Message.find()
           .sort({ createdAt: -1 })
@@ -27,7 +16,12 @@ export const configureChatSocket = (io: Server) => {
       } catch (error) {
         console.error('Erro ao carregar mensagens anteriores:', error);
       }
-    });
+    };
+
+    // Load previous messages on connection
+    await loadMessages();
+
+    socket.on('requestPreviousMessages', loadMessages);
 
     socket.on('sendMessage', async (messageText: string) => {
       if (!socket.user) {
@@ -45,10 +39,16 @@ export const configureChatSocket = (io: Server) => {
         // Send message to all connected clients
         io.emit('newMessage', {
           _id: message._id,
-          sender: socket.user.username,
+          sender: {
+            _id: socket.user._id,
+            username: socket.user.username,
+          },
           text: messageText,
           createdAt: message.createdAt,
         });
+
+        // Load messages again to ensure all clients have the latest messages
+        await loadMessages();
       } catch (error) {
         console.error('Erro ao salvar mensagem:', error);
         socket.emit('error', 'Erro ao enviar mensagem');
