@@ -17,6 +17,18 @@ export const configureChatSocket = (io: Server) => {
       console.error('Erro ao carregar mensagens anteriores:', error);
     }
 
+    socket.on('requestPreviousMessages', async () => {
+      try {
+        const messages = await Message.find()
+          .sort({ createdAt: -1 })
+          .limit(50)
+          .populate('sender', 'username');
+        socket.emit('loadPreviousMessages', messages.reverse());
+      } catch (error) {
+        console.error('Erro ao carregar mensagens anteriores:', error);
+      }
+    });
+
     socket.on('sendMessage', async (messageText: string) => {
       if (!socket.user) {
         socket.emit('error', 'Usuário não autenticado');
@@ -32,7 +44,7 @@ export const configureChatSocket = (io: Server) => {
 
         // Send message to all connected clients
         io.emit('newMessage', {
-          _id: message._id, // Add message ID
+          _id: message._id,
           sender: socket.user.username,
           text: messageText,
           createdAt: message.createdAt,
